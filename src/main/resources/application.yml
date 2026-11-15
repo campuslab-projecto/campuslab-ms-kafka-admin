@@ -1,0 +1,10 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: campuslab-ms-kafka-admin
+
+campuslab:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:19092}
