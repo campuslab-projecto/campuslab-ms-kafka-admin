@@ -114,15 +114,15 @@ public class KafkaAdminService {
 
         String name = request.name();
 
-        // Solo permitir topicos de CampusLab
-        if (!name.matches("campuslab\\.[a-z0-9._-]{3,100}")) {
+        // Solo permitir topicos de demostracion
+        if (!name.matches("campuslab\\.demo\\.[a-z0-9._-]{3,100}")) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Nombre de topico invalido"
+                    "Solo se permiten topicos campuslab.demo.*"
             );
         }
 
-        // Proteger los topicos existentes
+        // Proteger los topicos reales de CampusLab
         if (name.equals("campuslab.booking.events") ||
                 name.equals("campuslab.occupancy.events")) {
 
@@ -140,6 +140,7 @@ public class KafkaAdminService {
                 ? 1
                 : request.replicationFactor();
 
+        // Validar particiones y factor de replicacion
         if (partitions < 1 || partitions > 6 || replicas != 1) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
