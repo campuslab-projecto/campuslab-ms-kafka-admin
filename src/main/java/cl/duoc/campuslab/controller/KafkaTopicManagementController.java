@@ -1,39 +1,55 @@
 
 package cl.duoc.campuslab.controller;
 
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.NewTopic;
+import cl.duoc.campuslab.model.CreateTopicRequest;
+import cl.duoc.campuslab.model.UpdatePartitionsRequest;
+import cl.duoc.campuslab.model.UpdateTopicConfigRequest;
+import cl.duoc.campuslab.service.KafkaAdminService;
+import cl.duoc.campuslab.service.KafkaTopicManagementService;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/kafka/topics")
 public class KafkaTopicManagementController {
 
-    private final AdminClient admin;
+    private final KafkaAdminService kafkaAdminService;
+    private final KafkaTopicManagementService managementService;
     private final String adminKey;
 
     public KafkaTopicManagementController(
-            AdminClient admin,
+            KafkaAdminService kafkaAdminService,
+            KafkaTopicManagementService managementService,
             @Value("${KAFKA_ADMIN_API_KEY:}") String adminKey) {
 
-        this.admin = admin;
+        this.kafkaAdminService = kafkaAdminService;
+        this.managementService = managementService;
         this.adminKey = adminKey;
     }
 
-    public record CreateTopicRequest(
-            String name,
-            Integer partitions,
-            Short replicationFactor
-    ) {}
+    // Validar acceso administrativo
+    private void validateAdminKey(String providedKey) {
 
+        if (adminKey.isBlank() || providedKey == null ||
+                !MessageDigest.isEqual(
+                        adminKey.getBytes(StandardCharsets.UTF_8),
+                        providedKey.getBytes(StandardCharsets.UTF_8))) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Acceso administrativo denegado"
+            );
+        }
+    }
+
+    // 1. Crear un topico
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> createTopic(
@@ -44,52 +60,72 @@ public class KafkaTopicManagementController {
             @RequestBody CreateTopicRequest request
     ) throws Exception {
 
-        if (adminKey.isBlank() ||
-                !Objects.equals(adminKey, key)) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Acceso administrativo denegado"
-            );
-        }
+        validateAdminKey(key);
 
-        String name = request.name();
+        return kafkaAdminService.createTopic(request);
+    }
 
-        if (name == null ||
-                !name.matches("campuslab\\.[a-z0-9._-]{3,100}") ||
-                name.equals("campuslab.booking.events") ||
-                name.equals("campuslab.occupancy.events")) {
+    // 2. Consultar configuracion de un topico
+    @GetMapping("/{name}/config")
+    public Map<String, Object> getTopicConfig(
+            @PathVariable String name,
+            @RequestHeader(
+                    value = "X-Admin-Key",
+                    required = false
+            ) String key
+    ) throws Exception {
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Nombre de topico invalido o protegido"
-            );
-        }
+        validateAdminKey(key);
 
-        int partitions = request.partitions() == null
-                ? 1 : request.partitions();
+        return managementService.getTopicConfig(name);
+    }
 
-        short replicas = request.replicationFactor() == null
-                ? 1 : request.replicationFactor();
+    // 3. Modificar retencion y politica de limpieza
+    @PutMapping("/{name}/config")
+    public Map<String, String> updateTopicConfig(
+            @PathVariable String name,
+            @RequestHeader(
+                    value = "X-Admin-Key",
+                    required = false
+            ) String key,
+            @RequestBody UpdateTopicConfigRequest request
+    ) throws Exception {
 
-        if (partitions < 1 || partitions > 6 || replicas != 1) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Usar entre 1 y 6 particiones y 1 replica"
-            );
-        }
+        validateAdminKey(key);
 
-        NewTopic topic = new NewTopic(
-                name, partitions, replicas
-        );
+        return managementService.updateTopicConfig(name, request);
+    }
 
-        admin.createTopics(List.of(topic))
-                .all()
-                .get(15, TimeUnit.SECONDS);
+    // 4. Aumentar particiones
+    @PatchMapping("/{name}/partitions")
+    public Map<String, Object> updatePartitions(
+            @PathVariable String name,
+            @RequestHeader(
+                    value = "X-Admin-Key",
+                    required = false
+            ) String key,
+            @RequestBody UpdatePartitionsRequest request
+    ) throws Exception {
 
-        return Map.of(
-                "created", name,
-                "partitions", partitions,
-                "replicationFactor", replicas
-        );
+        validateAdminKey(key);
+
+        return managementService.updatePartitions(name, request);
+    }
+
+    // 5. Eliminar un topico de demostracion
+    @DeleteMapping("/{name}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTopic(
+            @PathVariable String name,
+            @RequestHeader(
+                    value = "X-Admin-Key",
+                    required = false
+            ) String key,
+            @RequestParam("confirm") String confirmation
+    ) throws Exception {
+
+        validateAdminKey(key);
+
+        managementService.deleteTopic(name, confirmation);
     }
 }
