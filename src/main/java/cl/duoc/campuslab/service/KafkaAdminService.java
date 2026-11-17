@@ -152,7 +152,7 @@ public class KafkaAdminService {
                 name,
                 partitions,
                 replicas
-        );
+        ).configs(Map.of("min.insync.replicas", "1"));
 
         admin.createTopics(List.of(topic))
                 .all()

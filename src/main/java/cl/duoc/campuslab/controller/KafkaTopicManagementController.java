@@ -62,7 +62,18 @@ public class KafkaTopicManagementController {
 
         validateAdminKey(key);
 
-        return kafkaAdminService.createTopic(request);
+        try {
+            return kafkaAdminService.createTopic(request);
+        } catch (java.util.concurrent.ExecutionException e) {
+            if (e.getCause() instanceof org.apache.kafka.common.errors.TopicExistsException) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "El topico ya existe",
+                        e
+                );
+            }
+            throw e;
+        }
     }
 
     // 2. Consultar configuracion de un topico
