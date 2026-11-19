@@ -19,14 +19,20 @@ public class KafkaAdminController {
         this.kafkaAdminService = kafkaAdminService;
     }
 
-    // 1. Listar los topicos de Kafka
+    // ==========================================
+    // 1. LISTAR TOPICOS
+    // ==========================================
+
     @GetMapping("/topics")
     public List<String> listTopics() throws Exception {
 
         return kafkaAdminService.listTopics();
     }
 
-    // 2. Consultar particiones y replicas
+    // ==========================================
+    // 2. CONSULTAR DETALLE DEL TOPICO
+    // ==========================================
+
     @GetMapping("/topics/{name}")
     public Map<String, Object> describeTopic(
             @PathVariable String name) throws Exception {
@@ -34,10 +40,24 @@ public class KafkaAdminController {
         return kafkaAdminService.describeTopic(name);
     }
 
-    // 3. Listar grupos de consumidores
+    // ==========================================
+    // 3. LISTAR GRUPOS DE CONSUMIDORES
+    // ==========================================
+
     @GetMapping("/groups")
     public List<String> listGroups() throws Exception {
 
         return kafkaAdminService.listGroups();
+    }
+
+    // ==========================================
+    // 4. MONITOREAR OFFSETS DE TOPICOS DLT
+    // ==========================================
+
+    @GetMapping("/dlt/offsets")
+    public Map<String, Object> getDltOffsets()
+            throws Exception {
+
+        return kafkaAdminService.getDltOffsets();
     }
 }
